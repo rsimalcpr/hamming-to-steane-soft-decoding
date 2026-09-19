@@ -28,129 +28,145 @@ Equivalently, ideal stabilizer measurement returns
     -1 -> syndrome bit 1
 """
 
+
 from __future__ import annotations
 
-import numpy as np
+from numpy.typing import ArrayLike
 
-from .pauli import symplectic_product
+from .gf2 import BinaryArray, add, as_binary_array, matmul
 
 
-def _as_binary_matrix(matrix: np.ndarray | list[list[int]]) -> np.ndarray:
-    """Return a validated two-dimensional binary matrix."""
+def _as_binary_matrix(
+    values: ArrayLike,
+    *,
+    name: str,
+) -> BinaryArray:
+    """Return a validated two-dimensional GF(2) matrix."""
+    matrix = as_binary_array(values, name=name)
 
-    arr = np.asarray(matrix, dtype=np.uint8)
+    if matrix.ndim != 2:
+        raise ValueError(f"{name} must be two-dimensional")
 
-    if arr.ndim != 2:
-        raise ValueError("Stabilizer representation must be a 2D matrix.")
+    return matrix
 
-    if not np.all((arr == 0) | (arr == 1)):
-        raise ValueError("Stabilizer matrices must contain only 0 and 1.")
 
-    return arr
+def _as_binary_vector(
+    values: ArrayLike,
+    *,
+    name: str,
+) -> BinaryArray:
+    """Return a validated one-dimensional GF(2) vector."""
+    vector = as_binary_array(values, name=name)
+
+    if vector.ndim != 1:
+        raise ValueError(f"{name} must be one-dimensional")
+
+    return vector
 
 
 def validate_stabilizers(
-    stabilizer_x: np.ndarray | list[list[int]],
-    stabilizer_z: np.ndarray | list[list[int]],
-) -> tuple[np.ndarray, np.ndarray]:
-    """Validate X and Z parts of a stabilizer-generator matrix."""
-
-    sx = _as_binary_matrix(stabilizer_x)
-    sz = _as_binary_matrix(stabilizer_z)
+    stabilizer_x: ArrayLike,
+    stabilizer_z: ArrayLike,
+) -> tuple[BinaryArray, BinaryArray]:
+    """Validate the X and Z parts of stabilizer generators."""
+    sx = _as_binary_matrix(
+        stabilizer_x,
+        name="stabilizer_x",
+    )
+    sz = _as_binary_matrix(
+        stabilizer_z,
+        name="stabilizer_z",
+    )
 
     if sx.shape != sz.shape:
         raise ValueError(
-            "The X and Z stabilizer matrices must have the same shape."
+            "stabilizer_x and stabilizer_z must have the same shape"
         )
 
     return sx, sz
 
 
 def commutation_matrix(
-    stabilizer_x: np.ndarray | list[list[int]],
-    stabilizer_z: np.ndarray | list[list[int]],
-) -> np.ndarray:
-    """Return pairwise symplectic products of stabilizer generators.
+    stabilizer_x: ArrayLike,
+    stabilizer_z: ArrayLike,
+) -> BinaryArray:
+    """Return all pairwise stabilizer symplectic products.
 
-    Entry (i, j) is
+    For stabilizer generators represented by matrices S_X and S_Z,
 
-        0 if stabilizers i and j commute
-        1 if stabilizers i and j anticommute
+        C = S_X S_Z^T + S_Z S_X^T  (mod 2)
 
-    A valid stabilizer group requires this matrix to be all zeros.
+    Entry C[i, j] equals
+
+        0 -> generators i and j commute
+        1 -> generators i and j anticommute.
     """
+    sx, sz = validate_stabilizers(
+        stabilizer_x,
+        stabilizer_z,
+    )
 
-    sx, sz = validate_stabilizers(stabilizer_x, stabilizer_z)
+    first_term = matmul(sx, sz.T)
+    second_term = matmul(sz, sx.T)
 
-    return (sx @ sz.T + sz @ sx.T) % 2
+    return add(first_term, second_term)
 
 
 def stabilizers_commute(
-    stabilizer_x: np.ndarray | list[list[int]],
-    stabilizer_z: np.ndarray | list[list[int]],
+    stabilizer_x: ArrayLike,
+    stabilizer_z: ArrayLike,
 ) -> bool:
     """Return True if every pair of stabilizer generators commutes."""
-
-    return bool(
-        np.all(
-            commutation_matrix(stabilizer_x, stabilizer_z) == 0
-        )
+    matrix = commutation_matrix(
+        stabilizer_x,
+        stabilizer_z,
     )
+
+    return not matrix.any()
 
 
 def syndrome(
-    error_x: np.ndarray | list[int],
-    error_z: np.ndarray | list[int],
-    stabilizer_x: np.ndarray | list[list[int]],
-    stabilizer_z: np.ndarray | list[list[int]],
-) -> np.ndarray:
-    """Calculate the ideal stabilizer syndrome of a Pauli error.
+    error_x: ArrayLike,
+    error_z: ArrayLike,
+    stabilizer_x: ArrayLike,
+    stabilizer_z: ArrayLike,
+) -> BinaryArray:
+    """Calculate the ideal syndrome of a Pauli error.
 
-    Parameters
-    ----------
-    error_x, error_z:
-        Binary symplectic representation of the error.
+    For stabilizers S = (S_X | S_Z) and error E = (e_X | e_Z),
 
-    stabilizer_x, stabilizer_z:
-        Binary symplectic representation of the stabilizer generators.
+        s = S_X e_Z + S_Z e_X  (mod 2).
 
-    Returns
-    -------
-    numpy.ndarray
-        Binary syndrome vector. A 1 means that the error anticommutes
-        with the corresponding stabilizer generator.
+    A syndrome bit is
+
+        0 -> error commutes with the corresponding stabilizer
+        1 -> error anticommutes with the corresponding stabilizer.
     """
+    sx, sz = validate_stabilizers(
+        stabilizer_x,
+        stabilizer_z,
+    )
 
-    sx, sz = validate_stabilizers(stabilizer_x, stabilizer_z)
+    ex = _as_binary_vector(
+        error_x,
+        name="error_x",
+    )
+    ez = _as_binary_vector(
+        error_z,
+        name="error_z",
+    )
 
-    error_x = np.asarray(error_x, dtype=np.uint8)
-    error_z = np.asarray(error_z, dtype=np.uint8)
-
-    if error_x.ndim != 1 or error_z.ndim != 1:
-        raise ValueError("Error X and Z parts must be one-dimensional.")
-
-    if len(error_x) != len(error_z):
-        raise ValueError("Error X and Z vectors must have equal length.")
-
-    if len(error_x) != sx.shape[1]:
+    if ex.shape != ez.shape:
         raise ValueError(
-            "Error length must match the number of physical qubits."
+            "error_x and error_z must have the same shape"
         )
 
-    if not np.all((error_x == 0) | (error_x == 1)):
-        raise ValueError("Error vectors must contain only 0 and 1.")
-
-    if not np.all((error_z == 0) | (error_z == 1)):
-        raise ValueError("Error vectors must contain only 0 and 1.")
-
-    result = np.zeros(sx.shape[0], dtype=np.uint8)
-
-    for j in range(sx.shape[0]):
-        result[j] = symplectic_product(
-            sx[j],
-            sz[j],
-            error_x,
-            error_z,
+    if ex.shape[0] != sx.shape[1]:
+        raise ValueError(
+            "error length must match the number of physical qubits"
         )
 
-    return result
+    x_z_term = matmul(sx, ez)
+    z_x_term = matmul(sz, ex)
+
+    return add(x_z_term, z_x_term)
