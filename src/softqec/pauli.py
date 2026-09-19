@@ -17,119 +17,118 @@ Global phases (+1, -1, +i, -i) are intentionally ignored because they do not
 affect commutation relations or syndrome calculations used in this project.
 """
 
+
 from __future__ import annotations
 
 import numpy as np
+from numpy.typing import ArrayLike, NDArray
+
+from .gf2 import as_binary_array
+
+BinaryArray = NDArray[np.uint8]
 
 
-def _as_binary_vector(v: np.ndarray | list[int]) -> np.ndarray:
+def _as_binary_vector(values: ArrayLike, *, name: str) -> BinaryArray:
     """Return a validated one-dimensional GF(2) vector."""
+    vector = as_binary_array(values, name=name)
 
-    arr = np.asarray(v, dtype=np.uint8)
+    if vector.ndim != 1:
+        raise ValueError(f"{name} must be one-dimensional")
 
-    if arr.ndim != 1:
-        raise ValueError("Pauli vectors must be one-dimensional.")
-
-    if not np.all((arr == 0) | (arr == 1)):
-        raise ValueError("Pauli vectors must contain only 0 and 1.")
-
-    return arr
+    return vector
 
 
-def pauli_string_to_symplectic(pauli: str) -> tuple[np.ndarray, np.ndarray]:
+def pauli_string_to_symplectic(
+    pauli: str,
+) -> tuple[BinaryArray, BinaryArray]:
     """Convert a Pauli string to binary symplectic form.
 
-    Parameters
-    ----------
-    pauli:
-        String containing only I, X, Y and Z.
+    The mapping is
 
-    Returns
-    -------
-    x, z:
-        Binary vectors describing the X and Z components.
+        I -> (0, 0)
+        X -> (1, 0)
+        Z -> (0, 1)
+        Y -> (1, 1)
 
-    Examples
-    --------
-    XZI -> x = [1, 0, 0], z = [0, 1, 0]
-    YII -> x = [1, 0, 0], z = [1, 0, 0]
+    Global phases are ignored.
     """
-
     pauli = pauli.upper()
 
     if not pauli:
-        raise ValueError("Pauli string cannot be empty.")
+        raise ValueError("Pauli string cannot be empty")
 
     allowed = {"I", "X", "Y", "Z"}
 
-    if any(p not in allowed for p in pauli):
-        raise ValueError("Pauli string may contain only I, X, Y and Z.")
+    if any(operator not in allowed for operator in pauli):
+        raise ValueError("Pauli string may contain only I, X, Y and Z")
 
     x = np.zeros(len(pauli), dtype=np.uint8)
     z = np.zeros(len(pauli), dtype=np.uint8)
 
-    for i, operator in enumerate(pauli):
+    for index, operator in enumerate(pauli):
         if operator == "X":
-            x[i] = 1
+            x[index] = 1
+
         elif operator == "Z":
-            z[i] = 1
+            z[index] = 1
+
         elif operator == "Y":
-            x[i] = 1
-            z[i] = 1
+            x[index] = 1
+            z[index] = 1
 
     return x, z
 
 
 def symplectic_product(
-    x1: np.ndarray | list[int],
-    z1: np.ndarray | list[int],
-    x2: np.ndarray | list[int],
-    z2: np.ndarray | list[int],
+    x1: ArrayLike,
+    z1: ArrayLike,
+    x2: ArrayLike,
+    z2: ArrayLike,
 ) -> int:
-    """Compute the binary symplectic inner product.
+    """Return the binary symplectic inner product.
 
-    For Pauli operators P1=(x1|z1) and P2=(x2|z2),
+    For P1 = (x1 | z1) and P2 = (x2 | z2),
 
         <P1, P2> = x1·z2 + z1·x2  (mod 2)
 
-    A result of 0 means that the operators commute.
-    A result of 1 means that they anticommute.
+    0 means that the Pauli operators commute.
+    1 means that they anticommute.
     """
+    x1 = _as_binary_vector(x1, name="x1")
+    z1 = _as_binary_vector(z1, name="z1")
+    x2 = _as_binary_vector(x2, name="x2")
+    z2 = _as_binary_vector(z2, name="z2")
 
-    x1 = _as_binary_vector(x1)
-    z1 = _as_binary_vector(z1)
-    x2 = _as_binary_vector(x2)
-    z2 = _as_binary_vector(z2)
+    if not (x1.shape == z1.shape == x2.shape == z2.shape):
+        raise ValueError("all Pauli vectors must have the same shape")
 
-    if not (len(x1) == len(z1) == len(x2) == len(z2)):
-        raise ValueError("All Pauli vectors must have the same length.")
+    value = (
+        int(np.dot(x1.astype(np.int64), z2.astype(np.int64)))
+        + int(np.dot(z1.astype(np.int64), x2.astype(np.int64)))
+    ) % 2
 
-    value = (np.dot(x1, z2) + np.dot(z1, x2)) % 2
-
-    return int(value)
+    return value
 
 
 def commutes(
-    x1: np.ndarray | list[int],
-    z1: np.ndarray | list[int],
-    x2: np.ndarray | list[int],
-    z2: np.ndarray | list[int],
+    x1: ArrayLike,
+    z1: ArrayLike,
+    x2: ArrayLike,
+    z2: ArrayLike,
 ) -> bool:
     """Return True if two Pauli operators commute."""
-
     return symplectic_product(x1, z1, x2, z2) == 0
 
 
 def pauli_weight(
-    x: np.ndarray | list[int],
-    z: np.ndarray | list[int],
+    x: ArrayLike,
+    z: ArrayLike,
 ) -> int:
-    """Return the number of qubits on which the Pauli is non-identity."""
+    """Return the number of non-identity qubit positions."""
+    x = _as_binary_vector(x, name="x")
+    z = _as_binary_vector(z, name="z")
 
-    x = _as_binary_vector(x)
-    z = _as_binary_vector(z)
+    if x.shape != z.shape:
+        raise ValueError("x and z must have the same shape")
 
-    if len(x) != len(z):
-        raise ValueError("X and Z vectors must have the same length.")
-
-    return int(np.count_nonzero(x | z))
+    return int(np.count_nonzero(np.bitwise_or(x, z)))
