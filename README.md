@@ -583,55 +583,6 @@ GitHub Actions runs the automated test workflow on committed changes.
 
 ---
 
-# Repository structure
-
-```text
-hamming-to-steane-soft-decoding/
-â”‚
-â”œâ”€â”€ README.md
-â”œâ”€â”€ WEEK1_GUIDE.md
-â”œâ”€â”€ WEEK2_GUIDE.md
-â”œâ”€â”€ pyproject.toml
-â”œâ”€â”€ Makefile
-â”‚
-â”œâ”€â”€ src/
-â”‚   â””â”€â”€ softqec/
-â”‚       â”œâ”€â”€ __init__.py
-â”‚       â”œâ”€â”€ gf2.py
-â”‚       â”œâ”€â”€ classical_codes.py
-â”‚       â”œâ”€â”€ classical_channels.py
-â”‚       â”œâ”€â”€ classical_decoders.py
-â”‚       â”œâ”€â”€ metrics.py
-â”‚       â”œâ”€â”€ pauli.py
-â”‚       â”œâ”€â”€ stabilizer.py
-â”‚       â”œâ”€â”€ css.py
-â”‚       â”œâ”€â”€ steane.py
-â”‚       â”œâ”€â”€ analog_syndrome.py
-â”‚       â””â”€â”€ quantum_decoders.py
-â”‚
-â”œâ”€â”€ tests/
-â”‚   â”œâ”€â”€ test_gf2.py
-â”‚   â”œâ”€â”€ test_hamming.py
-â”‚   â”œâ”€â”€ test_channels_decoders.py
-â”‚   â”œâ”€â”€ test_metrics.py
-â”‚   â”œâ”€â”€ test_pauli.py
-â”‚   â”œâ”€â”€ test_stabilizer.py
-â”‚   â”œâ”€â”€ test_css.py
-â”‚   â”œâ”€â”€ test_steane.py
-â”‚   â”œâ”€â”€ test_analog_syndrome.py
-â”‚   â””â”€â”€ test_quantum_decoders.py
-â”‚
-â”œâ”€â”€ notebooks/
-â”‚   â”œâ”€â”€ 01_classical_hamming.ipynb
-â”‚   â”œâ”€â”€ 02_hamming_to_steane.ipynb
-â”‚   â””â”€â”€ 03_noisy_steane_syndromes.ipynb
-â”‚
-â”œâ”€â”€ configs/
-â”œâ”€â”€ experiments/
-â””â”€â”€ results/
-```
-
----
 
 # Main outputs
 
