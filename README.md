@@ -6,7 +6,7 @@ The completed Week 1 milestone implements the classical Hamming [7,4,3] foundati
 
 The Week 2 milestone extends the same binary coding ideas into quantum error correction through Pauli symplectic algebra, stabilizer syndromes, CSS check matrices, and the Steane [[7,1,3]] code. The implementation validates logical operators and exhaustively tests all 21 single-qubit Pauli errors.
 
-The next milestone will introduce noisy analog syndrome measurements and compare hard-threshold decoding with soft-information decoding.
+The completed Week 3 milestone introduces noisy analog Steane syndrome measurements and compares hard thresholding with soft Gaussian maximum-likelihood decoding for the identity and all 21 single-qubit Pauli errors.
 
 ---
 
@@ -22,7 +22,7 @@ How much frame-error-rate improvement is obtained when a Hamming decoder retains
 
 How do parity checks, binary syndromes, and GF(2) linear algebra from the Hamming [7,4,3] code extend into stabilizer and CSS quantum error correction?
 
-### Planned soft-QEC question
+### Restricted soft-QEC question
 
 How much useful information is lost when noisy continuous stabilizer measurements are thresholded into binary syndrome bits before decoding?
 
@@ -72,15 +72,15 @@ Week 2 builds the quantum-coding layer through the following progression:
 
 ```text
 Pauli operators
-        ↓
+        â†“
 binary symplectic representation
-        ↓
+        â†“
 stabilizers and quantum syndromes
-        ↓
+        â†“
 CSS check matrices
-        ↓
+        â†“
 Steane [[7,1,3]] code
-        ↓
+        â†“
 logical error correction
 ```
 
@@ -111,7 +111,7 @@ P2 = (x2 | z2)
 commute when their symplectic product is zero:
 
 ```text
-x1 · z2 + z1 · x2 = 0 mod 2.
+x1 Â· z2 + z1 Â· x2 = 0 mod 2.
 ```
 
 A result of one means that they anticommute.
@@ -293,7 +293,92 @@ belongs to the stabilizer group.
 
 The correction therefore does not need to reproduce the exact physical error pattern.
 
-This stabilizer equivalence will become important for the Week 3 soft coset-MAP decoder.
+This stabilizer equivalence remains the foundation for a future coset-MAP extension. Week 3 intentionally uses a smaller single-Pauli ML experiment first.
+
+---
+
+# Week 3: noisy Steane syndromes
+
+Week 3 transfers the Week 1 hard-versus-soft comparison to stabilizer measurements of the Steane code.
+
+## Restricted hypothesis model
+
+The experiment uses the 22 equally likely hypotheses
+
+```text
+{I, X1, ..., X7, Y1, ..., Y7, Z1, ..., Z7}.
+```
+
+The six-bit syndrome is ordered as
+
+```text
+[X-check responses | Z-check responses].
+```
+
+For column `H_i` of the Steane parity-check matrix,
+
+```text
+I   -> [000 | 000]
+X_i -> [000 | H_i]
+Z_i -> [H_i | 000]
+Y_i -> [H_i | H_i].
+```
+
+All 22 signatures are unique.
+
+## Analog measurement model
+
+Each binary syndrome bit is represented by its ideal stabilizer eigenvalue and corrupted by independent Gaussian noise:
+
+```text
+s_j = 0 -> +1
+s_j = 1 -> -1
+
+y_j = (-1)^s_j + epsilon_j
+epsilon_j ~ Normal(0, sigma_m^2).
+```
+
+The two decoders receive exactly the same continuous observation.
+
+## Hard and soft decoders
+
+The hard path thresholds every measurement at zero and then chooses the nearest valid syndrome in Hamming distance:
+
+```text
+y -> thresholded six-bit syndrome -> nearest valid Pauli signature.
+```
+
+The soft path retains all six magnitudes. With equal hypothesis priors and common independent Gaussian variance, maximum likelihood reduces to
+
+```text
+E_hat = argmin_E ||y - mu_E||^2,
+```
+
+where `mu_E` is the ideal `+1/-1` syndrome signature of candidate error `E`.
+
+This is the direct syndrome-level counterpart of the Week 1 soft ML decoder.
+
+## Current Week 3 result
+
+With the committed seed and 30,000 trials per noise point, at `sigma_m = 1.0` the observed decoding failure rates are
+
+```text
+hard threshold + nearest syndrome: 0.52933
+soft Gaussian ML:                  0.45193.
+```
+
+This corresponds to an observed absolute reduction of approximately `0.0774` and a relative reduction of approximately `14.6%`.
+
+The corresponding 95% Wilson intervals are
+
+```text
+hard: [0.52368, 0.53498]
+soft: [0.44631, 0.45757].
+```
+
+This is a finite Monte Carlo result for a restricted, equally likely no-error/single-Pauli hypothesis model and a phenomenological Gaussian measurement channel.
+
+It is not presented as a fault-tolerance threshold or a complete soft-QEC decoder.
 
 ---
 
@@ -341,12 +426,24 @@ Run the configured Week 1 classical Monte Carlo experiment and rebuild its figur
 make classical
 ```
 
+Run the configured Week 3 quantum-syndrome experiment and rebuild its figure:
+
+```bash
+make quantum
+```
+
 For a fast classical smoke run while editing:
 
 ```bash
 python -m experiments.run_classical \
     --config configs/classical.toml \
     --trials 1000
+```
+
+For a fast Week 3 smoke run:
+
+```bash
+make smoke-quantum
 ```
 
 ---
@@ -465,54 +562,27 @@ all seven Y errors
 all seven Z errors.
 ```
 
+## Week 3 validation
+
+The noisy-syndrome test suite covers:
+
+```text
+binary-syndrome to stabilizer-eigenvalue mapping
+zero-noise analog channel behavior
+fixed-seed measurement reproducibility
+22 ordered no-error and single-Pauli hypotheses
+22 unique six-bit syndrome signatures
+X, Y, and Z syndrome structure
+noiseless hard decoding of all 22 hypotheses
+noiseless soft ML decoding of all 22 hypotheses
+a deterministic reliability example where soft ML helps
+all 484 restricted error-correction pairs modulo stabilizers.
+```
+
 GitHub Actions runs the automated test workflow on committed changes.
 
 ---
 
-# Repository structure
-
-```text
-hamming-to-steane-soft-decoding/
-│
-├── README.md
-├── WEEK1_GUIDE.md
-├── WEEK2_GUIDE.md
-├── pyproject.toml
-├── Makefile
-│
-├── src/
-│   └── softqec/
-│       ├── __init__.py
-│       ├── gf2.py
-│       ├── classical_codes.py
-│       ├── classical_channels.py
-│       ├── classical_decoders.py
-│       ├── metrics.py
-│       ├── pauli.py
-│       ├── stabilizer.py
-│       ├── css.py
-│       └── steane.py
-│
-├── tests/
-│   ├── test_gf2.py
-│   ├── test_hamming.py
-│   ├── test_channels_decoders.py
-│   ├── test_metrics.py
-│   ├── test_pauli.py
-│   ├── test_stabilizer.py
-│   ├── test_css.py
-│   └── test_steane.py
-│
-├── notebooks/
-│   ├── 01_classical_hamming.ipynb
-│   └── 02_hamming_to_steane.ipynb
-│
-├── configs/
-├── experiments/
-└── results/
-```
-
----
 
 # Main outputs
 
@@ -545,6 +615,27 @@ WEEK2_GUIDE.md
 ```
 
 These provide the validated Hamming-to-Steane quantum-coding bridge.
+
+## Week 3
+
+```text
+src/softqec/analog_syndrome.py
+src/softqec/quantum_decoders.py
+
+tests/test_analog_syndrome.py
+tests/test_quantum_decoders.py
+
+configs/quantum_single_pauli.toml
+experiments/run_quantum_single_pauli.py
+results/data/quantum_single_pauli_failure.csv
+results/data/quantum_single_pauli_metadata.json
+results/figures/quantum_single_pauli_failure_vs_sigma.png
+
+notebooks/03_noisy_steane_syndromes.ipynb
+WEEK3_GUIDE.md
+```
+
+These provide the restricted hard-versus-soft noisy-syndrome comparison.
 
 ---
 
@@ -596,27 +687,40 @@ The Steane code is used as a transparent classical-to-quantum bridge.
 
 It is not presented as a scalable QEC performance benchmark.
 
+## Week 3
+
+The Week 3 experiment assumes:
+
+```text
+identity or one single-qubit Pauli error
+22 equally likely hypotheses
+independent Gaussian noise on six one-shot syndrome measurements
+fixed hard-decoder tie breaking
+perfect correction application.
+```
+
+It intentionally omits:
+
+```text
+multi-qubit errors
+physical error-rate priors
+MAP decoding
+stabilizer-coset probability aggregation
+repeated syndrome rounds
+circuit-level and hardware-calibrated noise.
+```
+
+The result isolates the information lost through hard thresholding. It is not a fault-tolerance threshold or a scalable decoder benchmark.
+
 No employer data, internal specifications, proprietary source code, or proprietary implementation is used.
 
 ---
 
-# Next milestone: soft syndrome decoding
+# Future extension: degeneracy-aware soft decoding
 
-Week 3 will replace the ideal binary syndrome assumption with a continuous noisy measurement model.
+The natural research-grade extension is to include broader multi-qubit error patterns, assign physical-noise priors, and aggregate posterior probability over stabilizer-equivalent classes.
 
-For syndrome bit `s_j`,
-
-```text
-y_j = (-1)^s_j + epsilon_j
-
-epsilon_j ~ Normal(0, sigma_m^2).
-```
-
-The hard path will threshold `y_j` into a binary syndrome before lookup decoding.
-
-The soft path will retain its analog reliability information.
-
-For the small seven-qubit code, the planned exact decoder will enumerate physical error patterns and aggregate posterior probability over stabilizer-equivalent classes.
+That extension would replace the restricted equal-prior ML classifier with a degeneracy-aware coset-MAP decoder while preserving the analog syndrome model introduced in Week 3.
 
 The central comparison will therefore become
 
@@ -640,16 +744,18 @@ The experiment will study the trade-off between logical failure rate and computa
 
 Detailed explanations are available in:
 
-- [WEEK1_GUIDE.md](WEEK1_GUIDE.md) — GF(2), Hamming [7,4,3], BPSK/AWGN, hard decoding, and exact soft ML.
-- [WEEK2_GUIDE.md](WEEK2_GUIDE.md) — Pauli algebra, stabilizers, CSS construction, Steane [[7,1,3]], logical operators, and exhaustive single-qubit validation.
+- [WEEK1_GUIDE.md](WEEK1_GUIDE.md) â€” GF(2), Hamming [7,4,3], BPSK/AWGN, hard decoding, and exact soft ML.
+- [WEEK2_GUIDE.md](WEEK2_GUIDE.md) â€” Pauli algebra, stabilizers, CSS construction, Steane [[7,1,3]], logical operators, and exhaustive single-qubit validation.
+- [WEEK3_GUIDE.md](WEEK3_GUIDE.md) â€” analog Steane syndromes, restricted single-Pauli hard decoding, soft Gaussian ML, results, and limitations.
 
-The explanatory notebook
+The explanatory notebooks
 
 ```text
 notebooks/02_hamming_to_steane.ipynb
+notebooks/03_noisy_steane_syndromes.ipynb
 ```
 
-provides a compact executable walkthrough of the Week 2 classical-to-quantum bridge.
+provide compact executable walkthroughs of the Week 2 classical-to-quantum bridge and the Week 3 noisy-syndrome comparison.
 
 ---
 
