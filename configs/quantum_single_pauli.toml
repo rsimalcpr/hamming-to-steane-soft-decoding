@@ -1,0 +1,19 @@
+[experiment]
+seed = 20260920
+sigma_m = [
+    0.10,
+    0.20,
+    0.35,
+    0.50,
+    0.75,
+    1.00,
+    1.25,
+    1.50,
+    2.00,
+]
+trials_per_point = 30000
+
+[output]
+results_csv = "results/data/quantum_single_pauli_failure.csv"
+metadata_json = "results/data/quantum_single_pauli_metadata.json"
+figure_path = "results/figures/quantum_single_pauli_failure_vs_sigma.png"
